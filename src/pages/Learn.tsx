@@ -11,12 +11,8 @@ const Learn = () => {
   const { data: tweets, isLoading, error } = useQuery({
     queryKey: ['tweets'],
     queryFn: async () => {
-      const { data: { publicUrl } } = supabase.functions.getPublicUrl('get-tweets');
-      const response = await fetch(publicUrl);
-      if (!response.ok) {
-        throw new Error('Failed to fetch tweets');
-      }
-      const data = await response.json();
+      const { data, error } = await supabase.functions.invoke('get-tweets');
+      if (error) throw error;
       return data.data.map((tweet: any) => ({
         id: tweet.id,
         content: tweet.text,
