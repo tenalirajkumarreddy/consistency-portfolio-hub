@@ -5,26 +5,24 @@ import ConsistencyTracker from '@/components/ConsistencyTracker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Learn = () => {
   const { data: tweets, isLoading, error } = useQuery({
     queryKey: ['tweets'],
     queryFn: async () => {
-      // Placeholder for Twitter API integration
-      return [
-        {
-          id: '1',
-          content: "Just learned about React Query's new features! The stale-while-revalidate pattern is a game changer. #LearnInPublic",
-          date: new Date().toISOString(),
-          url: 'https://twitter.com',
-        },
-        {
-          id: '2',
-          content: 'Built my first custom hook today. Understanding the rules of hooks has made my React code much cleaner. #LearnInPublic',
-          date: new Date(Date.now() - 86400000).toISOString(),
-          url: 'https://twitter.com',
-        },
-      ];
+      const { data: { publicUrl } } = supabase.functions.getPublicUrl('get-tweets');
+      const response = await fetch(publicUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch tweets');
+      }
+      const data = await response.json();
+      return data.data.map((tweet: any) => ({
+        id: tweet.id,
+        content: tweet.text,
+        date: tweet.created_at,
+        url: `https://twitter.com/i/web/status/${tweet.id}`,
+      }));
     },
     refetchInterval: 60000, // Refetch every minute
   });
