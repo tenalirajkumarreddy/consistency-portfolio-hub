@@ -20,6 +20,7 @@ const Learn = () => {
         }
         throw error;
       }
+      // Return all tweets without filtering
       return data.data?.map((tweet: any) => ({
         id: tweet.id,
         content: tweet.text,

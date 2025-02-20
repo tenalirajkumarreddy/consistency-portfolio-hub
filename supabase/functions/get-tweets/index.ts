@@ -18,7 +18,7 @@ async function getTweets() {
   console.log("Using API_KEY length:", API_KEY?.length);
   console.log("Using ACCESS_TOKEN length:", ACCESS_TOKEN?.length);
 
-  const url = `${BASE_URL}/users/me/tweets?tweet.fields=created_at&max_results=10`;
+  const url = `${BASE_URL}/tweets?tweet.fields=created_at&max_results=100`;
   const headers = {
     Authorization: `Bearer ${ACCESS_TOKEN}`,
   };
