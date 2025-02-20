@@ -73,14 +73,13 @@ function generateOAuthHeader(method: string, url: string): string {
 
 const BASE_URL = "https://api.twitter.com/2";
 
-async function getTweets() {
-  console.log("Starting getTweets function");
-  
-  const url = `${BASE_URL}/users/me/tweets?tweet.fields=created_at&max_results=100`;
+async function getUser() {
+  const url = `${BASE_URL}/users/me`;
   const method = "GET";
   const oauthHeader = generateOAuthHeader(method, url);
   
-  console.log("OAuth Header:", oauthHeader);
+  console.log("Getting user details...");
+  console.log("OAuth Header for user request:", oauthHeader);
   
   const response = await fetch(url, {
     method: method,
@@ -92,15 +91,47 @@ async function getTweets() {
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Twitter API Error:", {
+    console.error("Twitter API Error (getUser):", {
       status: response.status,
       statusText: response.statusText,
       errorText,
     });
-    throw new Error(`Twitter API error: ${response.status} - ${errorText}`);
+    throw new Error(`Twitter API error (getUser): ${response.status} - ${errorText}`);
   }
 
-  console.log("Successfully received response from Twitter API");
+  const data = await response.json();
+  console.log("User data received:", data);
+  return data.data.id;
+}
+
+async function getTweets(userId: string) {
+  console.log("Starting getTweets function for user:", userId);
+  
+  const url = `${BASE_URL}/users/${userId}/tweets?tweet.fields=created_at&max_results=100`;
+  const method = "GET";
+  const oauthHeader = generateOAuthHeader(method, url);
+  
+  console.log("OAuth Header for tweets request:", oauthHeader);
+  
+  const response = await fetch(url, {
+    method: method,
+    headers: {
+      Authorization: oauthHeader,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Twitter API Error (getTweets):", {
+      status: response.status,
+      statusText: response.statusText,
+      errorText,
+    });
+    throw new Error(`Twitter API error (getTweets): ${response.status} - ${errorText}`);
+  }
+
+  console.log("Successfully received tweets from Twitter API");
   return await response.json();
 }
 
@@ -117,7 +148,14 @@ Deno.serve(async (req) => {
   try {
     console.log("Starting edge function execution");
     validateEnvironmentVariables();
-    const tweets = await getTweets();
+    
+    // First get the user ID
+    const userId = await getUser();
+    console.log("Got user ID:", userId);
+    
+    // Then get the tweets
+    const tweets = await getTweets(userId);
+    console.log("Got tweets:", tweets);
     
     return new Response(JSON.stringify(tweets), {
       headers: { 
