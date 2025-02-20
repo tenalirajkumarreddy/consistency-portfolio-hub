@@ -7,26 +7,45 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Twitter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 
 const Learn = () => {
+  const { toast } = useToast();
+  
   const { data: tweets, isLoading, error, isError } = useQuery({
     queryKey: ['tweets'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('get-tweets');
-      if (error) {
-        // Check if the error is due to missing Twitter credentials
-        if (error.message?.includes('Missing TWITTER_')) {
-          throw new Error('Twitter not connected');
+      try {
+        const { data, error } = await supabase.functions.invoke('get-tweets');
+        if (error) {
+          console.error('Error fetching tweets:', error);
+          // Check if the error is due to missing Twitter credentials
+          if (error.message?.includes('Missing TWITTER_')) {
+            throw new Error('Twitter credentials not configured');
+          }
+          throw error;
         }
-        throw error;
+        
+        if (!data?.data || data.data.length === 0) {
+          return [];
+        }
+
+        // Map the tweets to our format
+        return data.data.map((tweet: any) => ({
+          id: tweet.id,
+          content: tweet.text,
+          date: tweet.created_at,
+          url: `https://twitter.com/i/web/status/${tweet.id}`,
+        }));
+      } catch (err: any) {
+        console.error('Error in tweet fetch:', err);
+        toast({
+          variant: "destructive",
+          title: "Error fetching tweets",
+          description: err.message || "Failed to load tweets. Please try again later.",
+        });
+        throw err;
       }
-      // Return all tweets without filtering
-      return data.data?.map((tweet: any) => ({
-        id: tweet.id,
-        content: tweet.text,
-        date: tweet.created_at,
-        url: `https://twitter.com/i/web/status/${tweet.id}`,
-      })) || [];
     },
     refetchInterval: 60000, // Refetch every minute
   });
@@ -46,12 +65,12 @@ const Learn = () => {
         </section>
 
         <section className="space-y-6">
-          {isError && error?.message === 'Twitter not connected' ? (
+          {isError && error?.message === 'Twitter credentials not configured' ? (
             <Alert>
               <Twitter className="h-4 w-4" />
               <AlertTitle>Twitter Not Connected</AlertTitle>
               <AlertDescription className="mt-2">
-                <p className="mb-4">Please connect your Twitter account to display your tweets.</p>
+                <p className="mb-4">Please make sure all Twitter API credentials are properly configured.</p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -59,13 +78,14 @@ const Learn = () => {
                   onClick={() => window.open('https://developer.twitter.com/en/portal/dashboard', '_blank')}
                 >
                   <Twitter className="h-4 w-4" />
-                  Setup Twitter API
+                  Twitter Developer Portal
                 </Button>
               </AlertDescription>
             </Alert>
           ) : isError ? (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
               <AlertDescription>
                 Failed to load tweets. Please try again later.
               </AlertDescription>
