@@ -6,6 +6,11 @@ const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
 const ACCESS_TOKEN = Deno.env.get("TWITTER_ACCESS_TOKEN")?.trim();
 const ACCESS_TOKEN_SECRET = Deno.env.get("TWITTER_ACCESS_TOKEN_SECRET")?.trim();
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 function validateEnvironmentVariables() {
   if (!API_KEY) throw new Error("Missing TWITTER_CONSUMER_KEY");
   if (!API_SECRET) throw new Error("Missing TWITTER_CONSUMER_SECRET");
@@ -32,9 +37,6 @@ function generateOAuthSignature(
   const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
   const hmacSha1 = createHmac("sha1", signingKey);
   const signature = hmacSha1.update(signatureBaseString).digest("base64");
-  
-  console.log("Signature Base String:", signatureBaseString);
-  console.log("Generated Signature:", signature);
   
   return signature;
 }
@@ -71,16 +73,15 @@ function generateOAuthHeader(method: string, url: string): string {
   );
 }
 
-const BASE_URL = "https://api.twitter.com/2";
+const BASE_URL = "https://api.x.com/2";
 
 async function getUser() {
-  const url = `${BASE_URL}/users/me`;
+  console.log("Starting getUser function");
+  const url = `${BASE_URL}/users/me?user.fields=id,username`;
   const method = "GET";
   const oauthHeader = generateOAuthHeader(method, url);
   
-  console.log("Getting user details...");
-  console.log("OAuth Header for user request:", oauthHeader);
-  
+  console.log("Making request to Twitter API for user data");
   const response = await fetch(url, {
     method: method,
     headers: {
@@ -94,9 +95,9 @@ async function getUser() {
     console.error("Twitter API Error (getUser):", {
       status: response.status,
       statusText: response.statusText,
-      errorText,
+      error: errorText,
     });
-    throw new Error(`Twitter API error (getUser): ${response.status} - ${errorText}`);
+    throw new Error(`Twitter API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
@@ -107,12 +108,11 @@ async function getUser() {
 async function getTweets(userId: string) {
   console.log("Starting getTweets function for user:", userId);
   
-  const url = `${BASE_URL}/users/${userId}/tweets?tweet.fields=created_at&max_results=100`;
+  const url = `${BASE_URL}/users/${userId}/tweets?tweet.fields=created_at,text&max_results=10`;
   const method = "GET";
   const oauthHeader = generateOAuthHeader(method, url);
   
-  console.log("OAuth Header for tweets request:", oauthHeader);
-  
+  console.log("Making request to Twitter API for tweets");
   const response = await fetch(url, {
     method: method,
     headers: {
@@ -126,21 +126,18 @@ async function getTweets(userId: string) {
     console.error("Twitter API Error (getTweets):", {
       status: response.status,
       statusText: response.statusText,
-      errorText,
+      error: errorText,
     });
-    throw new Error(`Twitter API error (getTweets): ${response.status} - ${errorText}`);
+    throw new Error(`Twitter API error: ${response.status} - ${errorText}`);
   }
 
-  console.log("Successfully received tweets from Twitter API");
-  return await response.json();
+  const data = await response.json();
+  console.log("Tweets received:", data);
+  return data;
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -149,13 +146,11 @@ Deno.serve(async (req) => {
     console.log("Starting edge function execution");
     validateEnvironmentVariables();
     
-    // First get the user ID
     const userId = await getUser();
     console.log("Got user ID:", userId);
     
-    // Then get the tweets
     const tweets = await getTweets(userId);
-    console.log("Got tweets:", tweets);
+    console.log("Successfully fetched tweets");
     
     return new Response(JSON.stringify(tweets), {
       headers: { 
