@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 
 // Replace this with your Twitter username
-const TWITTER_USERNAME = 'lovable_dev'; 
+const TWITTER_USERNAME = 'rajkumartenali'; 
 
 const Learn = () => {
   const { toast } = useToast();

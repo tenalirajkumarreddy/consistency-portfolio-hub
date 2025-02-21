@@ -18,8 +18,13 @@ Deno.serve(async (req) => {
       throw new Error("Missing TWITTER_BEARER_TOKEN");
     }
 
+    const { username } = await req.json();
+    if (!username) {
+      throw new Error("Username is required");
+    }
+    console.log("Fetching tweets for username:", username);
+
     // First get the user ID using the username
-    const username = 'your_twitter_username'; // Replace with actual username
     const userResponse = await fetch(
       `https://api.twitter.com/2/users/by/username/${username}`,
       {
