@@ -9,6 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 
+// Replace this with your Twitter username
+const TWITTER_USERNAME = 'lovable_dev'; 
+
 const Learn = () => {
   const { toast } = useToast();
   
@@ -16,13 +19,13 @@ const Learn = () => {
     queryKey: ['tweets'],
     queryFn: async () => {
       try {
+        console.log('Fetching tweets for username:', TWITTER_USERNAME);
         const { data, error } = await supabase.functions.invoke('get-tweets', {
-          body: { username: 'your_twitter_username' } // Replace with your actual Twitter username
+          body: { username: TWITTER_USERNAME }
         });
         
         if (error) {
           console.error('Error fetching tweets:', error);
-          // Check if the error is due to missing Twitter credentials
           if (error.message?.includes('TWITTER_BEARER_TOKEN')) {
             throw new Error('Twitter credentials not configured');
           }
@@ -30,10 +33,11 @@ const Learn = () => {
         }
         
         if (!data?.data || data.data.length === 0) {
+          console.log('No tweets found');
           return [];
         }
 
-        // Map the tweets to our format
+        console.log('Tweets fetched successfully:', data);
         return data.data.map((tweet: any) => ({
           id: tweet.id,
           content: tweet.text,
@@ -50,8 +54,8 @@ const Learn = () => {
         throw err;
       }
     },
-    retry: 1, // Only retry once
-    retryDelay: 1000, // Wait 1 second before retrying
+    retry: 1,
+    retryDelay: 1000,
   });
 
   return (
