@@ -16,11 +16,14 @@ const Learn = () => {
     queryKey: ['tweets'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-tweets');
+        const { data, error } = await supabase.functions.invoke('get-tweets', {
+          body: { username: 'your_twitter_username' } // Replace with your actual Twitter username
+        });
+        
         if (error) {
           console.error('Error fetching tweets:', error);
           // Check if the error is due to missing Twitter credentials
-          if (error.message?.includes('Missing TWITTER_')) {
+          if (error.message?.includes('TWITTER_BEARER_TOKEN')) {
             throw new Error('Twitter credentials not configured');
           }
           throw error;
@@ -47,7 +50,8 @@ const Learn = () => {
         throw err;
       }
     },
-    refetchInterval: 60000, // Refetch every minute
+    retry: 1, // Only retry once
+    retryDelay: 1000, // Wait 1 second before retrying
   });
 
   return (
@@ -70,7 +74,12 @@ const Learn = () => {
               <Twitter className="h-4 w-4" />
               <AlertTitle>Twitter Not Connected</AlertTitle>
               <AlertDescription className="mt-2">
-                <p className="mb-4">Please make sure all Twitter API credentials are properly configured.</p>
+                <p className="mb-4">To display your tweets, you need to:</p>
+                <ol className="list-decimal list-inside space-y-2 mb-4">
+                  <li>Set up your Twitter Developer Account</li>
+                  <li>Add your Bearer Token to the Edge Function</li>
+                  <li>Update your Twitter username in the code</li>
+                </ol>
                 <Button
                   variant="outline"
                   size="sm"
