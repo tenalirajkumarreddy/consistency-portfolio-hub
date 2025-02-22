@@ -34,6 +34,22 @@ Deno.serve(async (req) => {
       }
     );
 
+    if (userResponse.status === 429) {
+      return new Response(
+        JSON.stringify({
+          error: "Rate limit exceeded. Please try again in a few minutes.",
+          isRateLimit: true
+        }),
+        { 
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders,
+          }
+        }
+      );
+    }
+
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
       console.error("Twitter API Error (getUser):", {
@@ -58,6 +74,22 @@ Deno.serve(async (req) => {
       }
     );
 
+    if (tweetsResponse.status === 429) {
+      return new Response(
+        JSON.stringify({
+          error: "Rate limit exceeded. Please try again in a few minutes.",
+          isRateLimit: true
+        }),
+        { 
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders,
+          }
+        }
+      );
+    }
+
     if (!tweetsResponse.ok) {
       const errorText = await tweetsResponse.text();
       console.error("Twitter API Error (getTweets):", {
@@ -80,9 +112,12 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error("Edge Function Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        isRateLimit: error.message.includes('429')
+      }),
       { 
-        status: 500,
+        status: error.message.includes('429') ? 429 : 500,
         headers: {
           'Content-Type': 'application/json',
           ...corsHeaders,

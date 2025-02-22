@@ -15,7 +15,7 @@ const TWITTER_USERNAME = 'rajkumartenali';
 const Learn = () => {
   const { toast } = useToast();
   
-  const { data: tweets, isLoading, error, isError } = useQuery({
+  const { data: tweets, isLoading, error, isError, refetch } = useQuery({
     queryKey: ['tweets'],
     queryFn: async () => {
       try {
@@ -51,16 +51,34 @@ const Learn = () => {
         }));
       } catch (err: any) {
         console.error('Error in tweet fetch:', err);
-        toast({
-          variant: "destructive",
-          title: "Error fetching tweets",
-          description: err.message || "Failed to load tweets. Please try again later.",
-        });
+        
+        // Special handling for rate limit errors
+        if (err.message?.includes('Too Many Requests') || err.message?.includes('429')) {
+          toast({
+            variant: "destructive",
+            title: "Rate Limit Exceeded",
+            description: "Please wait a few minutes before refreshing again.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Error fetching tweets",
+            description: err.message || "Failed to load tweets. Please try again later.",
+          });
+        }
         throw err;
       }
     },
-    retry: 1,
-    retryDelay: 1000,
+    retry: (failureCount, error: any) => {
+      // Don't retry on rate limits
+      if (error.message?.includes('Too Many Requests') || error.message?.includes('429')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    retryDelay: 5000, // 5 seconds between retries
+    refetchOnWindowFocus: false, // Disable automatic refetch on window focus
+    staleTime: 30000, // Consider data fresh for 30 seconds
   });
 
   return (
@@ -105,7 +123,19 @@ const Learn = () => {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>
-                Failed to load tweets. Please try again later.
+                {error.message?.includes('Too Many Requests') || error.message?.includes('429')
+                  ? "Rate limit exceeded. Please wait a few minutes before refreshing."
+                  : "Failed to load tweets. Please try again later."}
+                {!error.message?.includes('Too Many Requests') && !error.message?.includes('429') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => refetch()}
+                  >
+                    Try Again
+                  </Button>
+                )}
               </AlertDescription>
             </Alert>
           ) : null}
