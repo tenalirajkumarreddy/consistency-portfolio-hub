@@ -7,52 +7,60 @@ const corsHeaders = {
 };
 
 const BEARER_TOKEN = Deno.env.get("TWITTER_BEARER_TOKEN")?.trim();
-const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
-const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
-const ACCESS_TOKEN = Deno.env.get("TWITTER_ACCESS_TOKEN")?.trim();
-const ACCESS_TOKEN_SECRET = Deno.env.get("TWITTER_ACCESS_TOKEN_SECRET")?.trim();
 
 function validateEnvironmentVariables() {
   if (!BEARER_TOKEN) {
-    throw new Error("Missing TWITTER_BEARER_TOKEN");
-  }
-  if (!API_KEY) {
-    throw new Error("Missing TWITTER_CONSUMER_KEY");
-  }
-  if (!API_SECRET) {
-    throw new Error("Missing TWITTER_CONSUMER_SECRET");
-  }
-  if (!ACCESS_TOKEN) {
-    throw new Error("Missing TWITTER_ACCESS_TOKEN");
-  }
-  if (!ACCESS_TOKEN_SECRET) {
-    throw new Error("Missing TWITTER_ACCESS_TOKEN_SECRET");
+    throw new Error("TWITTER_BEARER_TOKEN environment variable is not configured");
   }
 }
 
 async function fetchTweetsWithBearer(userId: string) {
   console.log("Fetching tweets with Bearer token for user ID:", userId);
-  const tweetsResponse = await fetch(
-    `https://api.twitter.com/2/users/${userId}/tweets?tweet.fields=created_at,text&max_results=10`,
-    {
-      headers: {
-        'Authorization': `Bearer ${BEARER_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
+  
+  // Add retry mechanism for rate limiting
+  const maxRetries = 3;
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    try {
+      const tweetsResponse = await fetch(
+        `https://api.twitter.com/2/users/${userId}/tweets?tweet.fields=created_at,text&max_results=10`,
+        {
+          headers: {
+            'Authorization': `Bearer ${BEARER_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      // Handle rate limiting
+      if (tweetsResponse.status === 429) {
+        const retryAfter = tweetsResponse.headers.get('retry-after');
+        const delay = (retryAfter ? parseInt(retryAfter) : 60) * 1000;
+        console.log(`Rate limited. Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        attempt++;
+        continue;
+      }
+
+      if (!tweetsResponse.ok) {
+        const errorText = await tweetsResponse.text();
+        console.error("Twitter API Error (getTweets):", {
+          status: tweetsResponse.status,
+          statusText: tweetsResponse.statusText,
+          error: errorText,
+        });
+        throw new Error(`Twitter API error: ${tweetsResponse.status} - ${errorText}`);
+      }
+
+      return tweetsResponse.json();
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error;
+      console.log(`Attempt ${attempt + 1} failed, retrying...`);
+      attempt++;
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
-  );
-
-  if (!tweetsResponse.ok) {
-    const errorText = await tweetsResponse.text();
-    console.error("Twitter API Error (getTweets):", {
-      status: tweetsResponse.status,
-      statusText: tweetsResponse.statusText,
-      error: errorText,
-    });
-    throw new Error(`Twitter API error: ${tweetsResponse.status} - ${errorText}`);
   }
-
-  return tweetsResponse.json();
 }
 
 Deno.serve(async (req) => {
@@ -71,16 +79,28 @@ Deno.serve(async (req) => {
     }
     console.log("Fetching tweets for username:", username);
 
-    // First get the user ID using the username
-    const userResponse = await fetch(
-      `https://api.twitter.com/2/users/by/username/${username}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${BEARER_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
+    // First get the user ID using the username with retry mechanism
+    let userResponse;
+    let retries = 3;
+    
+    while (retries > 0) {
+      userResponse = await fetch(
+        `https://api.twitter.com/2/users/by/username/${username}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${BEARER_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (userResponse.status === 429) {
+        retries--;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
       }
-    );
+      break;
+    }
 
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
@@ -111,7 +131,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 500,
+        status: error.message.includes('rate') ? 429 : 500,
         headers: {
           'Content-Type': 'application/json',
           ...corsHeaders,
