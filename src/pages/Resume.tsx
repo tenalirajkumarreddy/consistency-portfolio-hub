@@ -22,7 +22,10 @@ const Resume = () => {
         .limit(1)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching resume:', error);
+        throw error;
+      }
       return data;
     },
   });
@@ -42,18 +45,29 @@ const Resume = () => {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const response = await fetch('/functions/v1/upload-resume', {
-        method: 'POST',
-        body: formData,
+      // First upload the file to storage
+      const fileName = file.name.replace(/[^\x00-\x7F]/g, '');
+      const filePath = `${crypto.randomUUID()}.pdf`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('resumes')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Then create the database record
+      const { error: dbError } = await supabase.from('resumes').insert({
+        filename: fileName,
+        file_path: filePath,
+        content_type: file.type,
+        size: file.size,
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
+      if (dbError) throw dbError;
 
       toast({
         title: 'Success',
@@ -61,10 +75,11 @@ const Resume = () => {
       });
 
       refetch();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Upload error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload resume',
+        description: 'Failed to upload resume: ' + error.message,
         variant: 'destructive',
       });
     } finally {
@@ -75,27 +90,29 @@ const Resume = () => {
   const handleDownload = async () => {
     if (!resume) return;
 
-    const { data, error } = await supabase.storage
-      .from('resumes')
-      .download(resume.file_path);
+    try {
+      const { data, error } = await supabase.storage
+        .from('resumes')
+        .download(resume.file_path);
 
-    if (error) {
+      if (error) throw error;
+
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = resume.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      console.error('Download error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to download resume',
+        description: 'Failed to download resume: ' + error.message,
         variant: 'destructive',
       });
-      return;
     }
-
-    const url = window.URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = resume.filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
   };
 
   return (
@@ -141,7 +158,11 @@ const Resume = () => {
           </CardContent>
         </Card>
 
-        {error ? (
+        {isLoading ? (
+          <div className="animate-pulse">
+            <div className="h-[800px] bg-gray-200 rounded-lg" />
+          </div>
+        ) : error ? (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
