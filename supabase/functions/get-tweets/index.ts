@@ -1,5 +1,5 @@
 
-import { createHmac } from "crypto";
+import { createHmac } from "node:crypto";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
