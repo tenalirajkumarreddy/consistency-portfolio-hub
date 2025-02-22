@@ -20,15 +20,20 @@ const Learn = () => {
     queryFn: async () => {
       try {
         console.log('Fetching tweets for username:', TWITTER_USERNAME);
+        
+        // First check if Twitter Bearer token is configured
+        const { data: configCheck, error: configError } = await supabase.functions.invoke('check-twitter-config');
+        
+        if (configError || !configCheck?.configured) {
+          throw new Error('Twitter credentials not configured');
+        }
+        
         const { data, error } = await supabase.functions.invoke('get-tweets', {
           body: { username: TWITTER_USERNAME }
         });
         
         if (error) {
           console.error('Error fetching tweets:', error);
-          if (error.message?.includes('TWITTER_BEARER_TOKEN')) {
-            throw new Error('Twitter credentials not configured');
-          }
           throw error;
         }
         
