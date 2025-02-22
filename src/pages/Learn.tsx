@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { TweetCard } from '@/components/TweetCard';
 import ConsistencyTracker from '@/components/ConsistencyTracker';
@@ -43,16 +42,16 @@ const Learn = () => {
         }
 
         console.log('Tweets fetched successfully:', data);
+        // The structure is now consistent whether from cache or Twitter API
         return data.data.map((tweet: any) => ({
           id: tweet.id,
-          content: tweet.text,
+          content: tweet.content || tweet.text, // Handle both cached and fresh tweets
           date: tweet.created_at,
-          url: `https://twitter.com/i/web/status/${tweet.id}`,
+          url: tweet.url || `https://twitter.com/i/web/status/${tweet.id}`,
         }));
       } catch (err: any) {
         console.error('Error in tweet fetch:', err);
         
-        // Special handling for rate limit errors
         if (err.message?.includes('Too Many Requests') || err.message?.includes('429')) {
           toast({
             variant: "destructive",
@@ -70,15 +69,14 @@ const Learn = () => {
       }
     },
     retry: (failureCount, error: any) => {
-      // Don't retry on rate limits
       if (error.message?.includes('Too Many Requests') || error.message?.includes('429')) {
         return false;
       }
       return failureCount < 3;
     },
-    retryDelay: 5000, // 5 seconds between retries
-    refetchOnWindowFocus: false, // Disable automatic refetch on window focus
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    retryDelay: 5000,
+    refetchOnWindowFocus: false,
+    staleTime: 30000,
   });
 
   return (

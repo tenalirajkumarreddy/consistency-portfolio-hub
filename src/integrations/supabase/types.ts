@@ -39,6 +39,33 @@ export type Database = {
         }
         Relationships: []
       }
+      tweets: {
+        Row: {
+          author_username: string
+          content: string
+          created_at: string
+          fetched_at: string | null
+          id: string
+          url: string
+        }
+        Insert: {
+          author_username: string
+          content: string
+          created_at: string
+          fetched_at?: string | null
+          id: string
+          url: string
+        }
+        Update: {
+          author_username?: string
+          content?: string
+          created_at?: string
+          fetched_at?: string | null
+          id?: string
+          url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
