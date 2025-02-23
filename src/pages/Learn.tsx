@@ -2,13 +2,18 @@
 import { useEffect, useState } from 'react';
 import ConsistencyTracker from '@/components/ConsistencyTracker';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Mail } from 'lucide-react';
+import { Mail, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 
 const Learn = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check active session and subscribe to auth changes
@@ -26,17 +31,27 @@ const Learn = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleGoogleLogin = async () => {
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/learn'
-        }
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error logging in with Google:', error);
+      if (isRegistering) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      setError(error.message);
+      console.error('Auth error:', error);
     }
   };
 
@@ -73,21 +88,58 @@ const Learn = () => {
 
         <section className="space-y-6">
           {!session ? (
-            <div className="text-center">
+            <div className="max-w-md mx-auto">
               <Alert className="mb-6">
                 <Mail className="h-4 w-4" />
-                <AlertTitle>Not Signed In</AlertTitle>
+                <AlertTitle>{isRegistering ? 'Create an Account' : 'Welcome Back'}</AlertTitle>
                 <AlertDescription>
-                  Please sign in with your Google account to access your learning dashboard.
+                  {isRegistering ? 'Sign up to start tracking your learning journey.' : 'Please sign in to access your learning dashboard.'}
                 </AlertDescription>
               </Alert>
-              <Button 
-                onClick={handleGoogleLogin}
-                className="bg-red-500 hover:bg-red-600"
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                Sign in with Google
-              </Button>
+
+              {error && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <form onSubmit={handleAuth} className="space-y-4">
+                <div>
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit"
+                  className="w-full"
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  {isRegistering ? 'Sign Up' : 'Sign In'}
+                </Button>
+              </form>
+
+              <div className="mt-4 text-center">
+                <Button
+                  variant="link"
+                  onClick={() => setIsRegistering(!isRegistering)}
+                >
+                  {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
