@@ -12,6 +12,7 @@ const loadTwitterWidget = () => {
   const script = document.createElement('script');
   script.src = "https://platform.twitter.com/widgets.js";
   script.async = true;
+  script.charset = "utf-8";
   document.body.appendChild(script);
   return () => {
     document.body.removeChild(script);
@@ -51,12 +52,25 @@ const Learn = () => {
             <div className="space-y-4">
               <a 
                 className="twitter-timeline" 
-                data-theme="light" 
+                data-theme="light"
+                data-chrome="noheader nofooter noborders transparent"
                 data-tweet-limit="5"
+                data-dnt="true"
+                data-show-replies="false"
                 href={`https://twitter.com/${TWITTER_USERNAME}?ref_src=twsrc%5Etfw`}
               >
                 Loading tweets...
               </a>
+              <div className="mt-4 text-center">
+                <a 
+                  href={`https://twitter.com/${TWITTER_USERNAME}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-600"
+                >
+                  View more on Twitter
+                </a>
+              </div>
             </div>
           )}
         </section>
