@@ -1,83 +1,28 @@
-import { useQuery } from '@tanstack/react-query';
-import { TweetCard } from '@/components/TweetCard';
+
+import { useEffect } from 'react';
 import ConsistencyTracker from '@/components/ConsistencyTracker';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Twitter } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
+import { Twitter } from 'lucide-react';
 
 // Replace this with your Twitter username
-const TWITTER_USERNAME = 'rajkumartenali'; 
+const TWITTER_USERNAME = 'rajkumartenali';
+
+// Load Twitter embed script
+const loadTwitterWidget = () => {
+  const script = document.createElement('script');
+  script.src = "https://platform.twitter.com/widgets.js";
+  script.async = true;
+  document.body.appendChild(script);
+  return () => {
+    document.body.removeChild(script);
+  };
+};
 
 const Learn = () => {
-  const { toast } = useToast();
-  
-  const { data: tweets, isLoading, error, isError, refetch } = useQuery({
-    queryKey: ['tweets'],
-    queryFn: async () => {
-      try {
-        console.log('Fetching tweets for username:', TWITTER_USERNAME);
-        
-        // First check if Twitter Bearer token is configured
-        const { data: configCheck, error: configError } = await supabase.functions.invoke('check-twitter-config');
-        
-        if (configError || !configCheck?.configured) {
-          throw new Error('Twitter credentials not configured');
-        }
-        
-        const { data, error } = await supabase.functions.invoke('get-tweets', {
-          body: { username: TWITTER_USERNAME }
-        });
-        
-        if (error) {
-          console.error('Error fetching tweets:', error);
-          throw error;
-        }
-        
-        if (!data?.data || data.data.length === 0) {
-          console.log('No tweets found');
-          return [];
-        }
-
-        console.log('Tweets fetched successfully:', data);
-        // The structure is now consistent whether from cache or Twitter API
-        return data.data.map((tweet: any) => ({
-          id: tweet.id,
-          content: tweet.content || tweet.text, // Handle both cached and fresh tweets
-          date: tweet.created_at,
-          url: tweet.url || `https://twitter.com/i/web/status/${tweet.id}`,
-        }));
-      } catch (err: any) {
-        console.error('Error in tweet fetch:', err);
-        
-        if (err.message?.includes('Too Many Requests') || err.message?.includes('429')) {
-          toast({
-            variant: "destructive",
-            title: "Rate Limit Exceeded",
-            description: "Please wait a few minutes before refreshing again.",
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Error fetching tweets",
-            description: err.message || "Failed to load tweets. Please try again later.",
-          });
-        }
-        throw err;
-      }
-    },
-    retry: (failureCount, error: any) => {
-      if (error.message?.includes('Too Many Requests') || error.message?.includes('429')) {
-        return false;
-      }
-      return failureCount < 3;
-    },
-    retryDelay: 5000,
-    refetchOnWindowFocus: false,
-    staleTime: 30000,
-  });
+  useEffect(() => {
+    const cleanup = loadTwitterWidget();
+    return cleanup;
+  }, []);
 
   return (
     <div className="min-h-screen pt-20 px-4">
@@ -94,72 +39,25 @@ const Learn = () => {
         </section>
 
         <section className="space-y-6">
-          {isError && error?.message === 'Twitter credentials not configured' ? (
+          {!TWITTER_USERNAME ? (
             <Alert>
               <Twitter className="h-4 w-4" />
               <AlertTitle>Twitter Not Connected</AlertTitle>
-              <AlertDescription className="mt-2">
-                <p className="mb-4">To display your tweets, you need to:</p>
-                <ol className="list-decimal list-inside space-y-2 mb-4">
-                  <li>Set up your Twitter Developer Account</li>
-                  <li>Add your Bearer Token to the Edge Function</li>
-                  <li>Update your Twitter username in the code</li>
-                </ol>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => window.open('https://developer.twitter.com/en/portal/dashboard', '_blank')}
-                >
-                  <Twitter className="h-4 w-4" />
-                  Twitter Developer Portal
-                </Button>
-              </AlertDescription>
-            </Alert>
-          ) : isError ? (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
               <AlertDescription>
-                {error.message?.includes('Too Many Requests') || error.message?.includes('429')
-                  ? "Rate limit exceeded. Please wait a few minutes before refreshing."
-                  : "Failed to load tweets. Please try again later."}
-                {!error.message?.includes('Too Many Requests') && !error.message?.includes('429') && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => refetch()}
-                  >
-                    Try Again
-                  </Button>
-                )}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : tweets?.length === 0 ? (
-            <Alert>
-              <AlertTitle>No Tweets Found</AlertTitle>
-              <AlertDescription>
-                Start sharing your learning journey on Twitter to see your tweets here.
+                Please update the TWITTER_USERNAME constant in the code with your Twitter username.
               </AlertDescription>
             </Alert>
           ) : (
-            tweets?.map((tweet) => (
-              <TweetCard
-                key={tweet.id}
-                content={tweet.content}
-                date={tweet.date}
-                url={tweet.url}
-              />
-            ))
+            <div className="space-y-4">
+              <a 
+                className="twitter-timeline" 
+                data-theme="light" 
+                data-tweet-limit="5"
+                href={`https://twitter.com/${TWITTER_USERNAME}?ref_src=twsrc%5Etfw`}
+              >
+                Loading tweets...
+              </a>
+            </div>
           )}
         </section>
       </div>
